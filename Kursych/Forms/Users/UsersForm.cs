@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Windows.Forms;
 using Kursych.Forms.Main;
 using System.Data;
+using System.Drawing;
 
 namespace Kursych.Forms.Users
 {
@@ -10,6 +11,7 @@ namespace Kursych.Forms.Users
     {
         private List<User> users = new List<User>();
         private DatabaseService dbService;
+        private bool showPersonalData = false; // Флаг для отображения ПД
 
         public UsersForm()
         {
@@ -21,6 +23,8 @@ namespace Kursych.Forms.Users
             this.btnEdit.Click += new EventHandler(this.btnEdit_Click);
             this.btnDelete.Click += new EventHandler(this.btnDelete_Click);
             this.btnRefresh.Click += new EventHandler(this.btnRefresh_Click);
+            this.btnViewDetails.Click += new EventHandler(this.btnViewDetails_Click);
+            this.dataGridView.CellDoubleClick += new DataGridViewCellEventHandler(this.dataGridView_CellDoubleClick);
 
             // Загружаем данные
             LoadUsers();
@@ -35,35 +39,33 @@ namespace Kursych.Forms.Users
                 dataGridView.Rows.Clear();
                 dataGridView.Columns.Clear();
 
-                // Создаем колонки
+                // Создаем колонки (основные - всегда видны)
                 dataGridView.Columns.Add("UserID", "ID");
                 dataGridView.Columns.Add("UserLogin", "Логин");
-                dataGridView.Columns.Add("FullName", "ФИО");
-                dataGridView.Columns.Add("Phone", "Телефон");
+                dataGridView.Columns.Add("FullName", "ФИО (сокр.)");
                 dataGridView.Columns.Add("RoleName", "Роль");
-                dataGridView.Columns.Add("Email", "Email");
                 dataGridView.Columns.Add("CreatedDate", "Дата создания");
+
+                // Персональные данные (будут скрыты по умолчанию)
+                dataGridView.Columns.Add("FullNameFull", "ФИО полное");
+                dataGridView.Columns.Add("Phone", "Телефон");
+                dataGridView.Columns.Add("Email", "Email");
+                dataGridView.Columns.Add("Address", "Адрес");
+                dataGridView.Columns.Add("BirthDate", "Дата рождения");
 
                 if (dataGridView.Columns.Contains("UserID"))
                     dataGridView.Columns["UserID"].Visible = false;
 
+                // Настройка видимости персональных данных
+                ConfigurePersonalDataVisibility();
+
                 // Настройка ширины колонок
-                if (dataGridView.Columns.Contains("UserLogin"))
-                    dataGridView.Columns["UserLogin"].Width = 100;
-                if (dataGridView.Columns.Contains("FullName"))
-                    dataGridView.Columns["FullName"].Width = 200;
-                if (dataGridView.Columns.Contains("Phone"))
-                    dataGridView.Columns["Phone"].Width = 100;
-                if (dataGridView.Columns.Contains("RoleName"))
-                    dataGridView.Columns["RoleName"].Width = 100;
-                if (dataGridView.Columns.Contains("Email"))
-                    dataGridView.Columns["Email"].Width = 150;
-                if (dataGridView.Columns.Contains("CreatedDate"))
-                    dataGridView.Columns["CreatedDate"].Width = 120;
+                ConfigureColumnWidth();
 
                 foreach (DataRow row in usersTable.Rows)
                 {
                     string fullName = $"{row["UserSurname"]} {row["UserName"]} {row["UserPatronymic"]}".Trim();
+                    string shortName = GetShortName(row["UserSurname"].ToString(), row["UserName"].ToString());
 
                     // Определяем роль по RoleID
                     string roleName = GetRoleNameByID(Convert.ToInt32(row["RoleID"]));
@@ -80,7 +82,11 @@ namespace Kursych.Forms.Users
                         Phone = row.Table.Columns.Contains("Phone") && !row.IsNull("Phone") ?
                                 row["Phone"].ToString() : "",
                         Email = row.Table.Columns.Contains("Email") && !row.IsNull("Email") ?
-                               row["Email"].ToString() : ""
+                               row["Email"].ToString() : "",
+                        Address = row.Table.Columns.Contains("Address") && !row.IsNull("Address") ?
+                                 row["Address"].ToString() : "",
+                        BirthDate = row.Table.Columns.Contains("BirthDate") && !row.IsNull("BirthDate") ?
+                                   Convert.ToDateTime(row["BirthDate"]) : (DateTime?)null
                     };
 
                     if (row.Table.Columns.Contains("CreatedDate") && !row.IsNull("CreatedDate"))
@@ -93,18 +99,33 @@ namespace Kursych.Forms.Users
                     }
 
                     user.RoleName = roleName;
+                    user.IsActive = true; // По умолчанию активен
 
                     users.Add(user);
-                    dataGridView.Rows.Add(
+
+                    // Добавляем строку с данными
+                    int rowIndex = dataGridView.Rows.Add(
                         user.UserID,
                         user.UserLogin,
-                        fullName,
-                        user.Phone,
+                        shortName,
                         user.RoleName,
-                        user.Email,
-                        user.CreatedDate.ToString("dd.MM.yyyy HH:mm")
+                        user.CreatedDate.ToString("dd.MM.yyyy HH:mm"),
+                        fullName,  // полное ФИО (скрыто)
+                        MaskPhone(user.Phone),  // маскированный телефон
+                        MaskEmail(user.Email),  // маскированный email
+                        MaskAddress(user.Address),  // маскированный адрес
+                        user.BirthDate?.ToString("dd.MM.yyyy") ?? "**.**.****"  // дата рождения
                     );
+
+                    // Сохраняем полный объект пользователя в теге строки
+                    dataGridView.Rows[rowIndex].Tag = user;
                 }
+
+                // Применяем условное форматирование
+                ApplyConditionalFormatting();
+
+                // Обновляем информацию о количестве записей
+                UpdateCounters();
             }
             catch (Exception ex)
             {
@@ -112,6 +133,189 @@ namespace Kursych.Forms.Users
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
+
+        // Настройка видимости персональных данных
+        private void ConfigurePersonalDataVisibility()
+        {
+            bool show = showPersonalData && (UserSession.IsAdmin || UserSession.IsManager);
+
+            if (dataGridView.Columns.Contains("FullNameFull"))
+                dataGridView.Columns["FullNameFull"].Visible = show;
+            if (dataGridView.Columns.Contains("Phone"))
+                dataGridView.Columns["Phone"].Visible = show;
+            if (dataGridView.Columns.Contains("Email"))
+                dataGridView.Columns["Email"].Visible = show;
+            if (dataGridView.Columns.Contains("Address"))
+                dataGridView.Columns["Address"].Visible = show;
+            if (dataGridView.Columns.Contains("BirthDate"))
+                dataGridView.Columns["BirthDate"].Visible = show;
+
+            // Обновляем текст кнопки
+            if (btnTogglePersonalData != null)
+            {
+                btnTogglePersonalData.Text = show ? "🔒 Скрыть ПД" : "👁️ Показать ПД";
+            }
+        }
+
+        private void ConfigureColumnWidth()
+        {
+            if (dataGridView.Columns.Contains("UserLogin"))
+                dataGridView.Columns["UserLogin"].Width = 100;
+            if (dataGridView.Columns.Contains("FullName"))
+                dataGridView.Columns["FullName"].Width = 150;
+            if (dataGridView.Columns.Contains("RoleName"))
+                dataGridView.Columns["RoleName"].Width = 100;
+            if (dataGridView.Columns.Contains("CreatedDate"))
+                dataGridView.Columns["CreatedDate"].Width = 120;
+
+            // Ширина для персональных данных
+            if (dataGridView.Columns.Contains("FullNameFull"))
+                dataGridView.Columns["FullNameFull"].Width = 200;
+            if (dataGridView.Columns.Contains("Phone"))
+                dataGridView.Columns["Phone"].Width = 120;
+            if (dataGridView.Columns.Contains("Email"))
+                dataGridView.Columns["Email"].Width = 150;
+            if (dataGridView.Columns.Contains("Address"))
+                dataGridView.Columns["Address"].Width = 200;
+            if (dataGridView.Columns.Contains("BirthDate"))
+                dataGridView.Columns["BirthDate"].Width = 100;
+        }
+
+        // Методы маскировки персональных данных
+        private string GetShortName(string surname, string name)
+        {
+            if (string.IsNullOrEmpty(surname)) return "";
+            if (string.IsNullOrEmpty(name)) return surname;
+            return $"{surname} {name[0]}.";
+        }
+
+        private string MaskPhone(string phone)
+        {
+            if (string.IsNullOrEmpty(phone)) return "";
+            if (phone.Length < 7) return "***";
+
+            // Показываем первые 4 и последние 2 цифры
+            if (phone.Length >= 11)
+            {
+                return phone.Substring(0, 4) + "***" + phone.Substring(phone.Length - 2);
+            }
+            return phone.Substring(0, Math.Min(4, phone.Length)) + "***";
+        }
+
+        private string MaskEmail(string email)
+        {
+            if (string.IsNullOrEmpty(email) || !email.Contains("@")) return "***";
+
+            string[] parts = email.Split('@');
+            if (parts[0].Length <= 2) return "***@" + parts[1];
+
+            // Показываем первые 2 символа и домен
+            return parts[0].Substring(0, 2) + "***@" + parts[1];
+        }
+
+        private string MaskAddress(string address)
+        {
+            if (string.IsNullOrEmpty(address)) return "";
+            if (address.Length <= 5) return "***";
+
+            // Показываем только первые 5 символов
+            return address.Substring(0, 5) + "...";
+        }
+
+        // Условное форматирование строк
+        private void ApplyConditionalFormatting()
+        {
+            foreach (DataGridViewRow row in dataGridView.Rows)
+            {
+                if (row.Tag is User user)
+                {
+                    // Подсветка администраторов
+                    if (user.RoleID == 1)
+                    {
+                        row.DefaultCellStyle.BackColor = Color.FromArgb(230, 242, 255); // Светло-голубой
+                        row.DefaultCellStyle.ForeColor = Color.FromArgb(0, 51, 102);
+                    }
+
+                    // Подсветка неактивных пользователей (если есть поле IsActive)
+                    if (!user.IsActive)
+                    {
+                        row.DefaultCellStyle.BackColor = Color.FromArgb(255, 220, 220); // Светло-красный
+                        row.DefaultCellStyle.ForeColor = Color.DarkRed;
+                    }
+
+                    // Подсветка пользователей без телефона
+                    if (string.IsNullOrEmpty(user.Phone))
+                    {
+                        row.Cells["Phone"].Style.BackColor = Color.FromArgb(255, 240, 240);
+                        row.Cells["Phone"].Style.ForeColor = Color.DarkRed;
+                    }
+                }
+            }
+        }
+
+        // Обновление счетчиков
+        private void UpdateCounters()
+        {
+            int total = users.Count;
+            int showing = dataGridView.Rows.Count;
+
+            if (lblCounter != null)
+            {
+                lblCounter.Text = $"Показано: {showing} из {total}";
+            }
+        }
+
+        // Просмотр детальной информации (с полными ПД)
+        private void ShowUserDetails(User user)
+        {
+            UserDetailForm detailForm = new UserDetailForm(user);
+            detailForm.ShowDialog();
+        }
+
+        // Обработчик для кнопки просмотра деталей
+        private void btnViewDetails_Click(object sender, EventArgs e)
+        {
+            if (dataGridView.SelectedRows.Count == 0)
+            {
+                MessageBox.Show("Выберите пользователя для просмотра", "Информация",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            if (dataGridView.SelectedRows[0].Tag is User user)
+            {
+                ShowUserDetails(user);
+            }
+        }
+
+        // Обработчик двойного клика по строке
+        private void dataGridView_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex >= 0 && dataGridView.Rows[e.RowIndex].Tag is User user)
+            {
+                ShowUserDetails(user);
+            }
+        }
+
+        // Обработчик для переключения отображения ПД
+        private void btnTogglePersonalData_Click(object sender, EventArgs e)
+        {
+            // Только администраторы и менеджеры могут переключать режим
+            if (!UserSession.IsAdmin && !UserSession.IsManager)
+            {
+                MessageBox.Show("У вас нет прав для просмотра персональных данных",
+                    "Доступ запрещен", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            showPersonalData = !showPersonalData;
+            ConfigurePersonalDataVisibility();
+        }
+
+        // Остальные существующие методы (GetRoleNameByID, GetRoleIDByName, 
+        // IsDuplicateFullName, IsDuplicatePhone, IsDuplicateEmail,
+        // btnAdd_Click, btnEdit_Click, btnDelete_Click, btnRefresh_Click)
+        // остаются без изменений
 
         private string GetRoleNameByID(int roleID)
         {
@@ -187,7 +391,6 @@ namespace Kursych.Forms.Users
             return false;
         }
 
-        // ЯВНЫЕ обработчики событий
         private void btnAdd_Click(object sender, EventArgs e)
         {
             try
@@ -273,7 +476,8 @@ namespace Kursych.Forms.Users
                         Email = email,
                         RoleID = GetRoleIDByName(roleName),
                         RoleName = roleName,
-                        CreatedDate = DateTime.Now
+                        CreatedDate = DateTime.Now,
+                        IsActive = true
                     };
 
                     if (dbService.AddUser(newUser))

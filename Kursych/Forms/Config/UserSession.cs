@@ -74,6 +74,7 @@ namespace Kursych
         public string Phone { get; set; }
         public string Email { get; set; }
         public string Address { get; set; }
+        public DateTime? BirthDate { get; set; } // Добавляем поле даты рождения
         public DateTime CreatedDate { get; set; }
         public bool IsActive { get; set; } = true;
 
@@ -84,7 +85,11 @@ namespace Kursych
 
         public string ShortName
         {
-            get { return $"{UserSurname} {UserName[0]}."; }
+            get
+            {
+                if (string.IsNullOrEmpty(UserName)) return UserSurname;
+                return $"{UserSurname} {UserName[0]}.";
+            }
         }
     }
 }

@@ -14,6 +14,9 @@
         private System.Windows.Forms.Button btnEdit;
         private System.Windows.Forms.Button btnDelete;
         private System.Windows.Forms.Button btnRefresh;
+        private System.Windows.Forms.Button btnViewDetails;
+        private System.Windows.Forms.Button btnTogglePersonalData;
+        private System.Windows.Forms.Label lblCounter;
 
         protected override void Dispose(bool disposing)
         {
@@ -54,6 +57,52 @@
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "Управление пользователями";
 
+
+
+            // Кнопка просмотра деталей
+            this.btnViewDetails = new System.Windows.Forms.Button();
+            this.btnViewDetails.BackColor = System.Drawing.Color.FromArgb(52, 152, 219);
+            this.btnViewDetails.FlatAppearance.BorderSize = 0;
+            this.btnViewDetails.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnViewDetails.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
+            this.btnViewDetails.ForeColor = System.Drawing.Color.White;
+            this.btnViewDetails.Location = new System.Drawing.Point(420, 25);
+            this.btnViewDetails.Name = "btnViewDetails";
+            this.btnViewDetails.Size = new System.Drawing.Size(150, 35);
+            this.btnViewDetails.TabIndex = 4;
+            this.btnViewDetails.Text = "👤 Подробнее";
+            this.btnViewDetails.UseVisualStyleBackColor = false;
+
+            // Кнопка переключения ПД
+            this.btnTogglePersonalData = new System.Windows.Forms.Button();
+            this.btnTogglePersonalData.BackColor = System.Drawing.Color.FromArgb(155, 89, 182);
+            this.btnTogglePersonalData.FlatAppearance.BorderSize = 0;
+            this.btnTogglePersonalData.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnTogglePersonalData.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
+            this.btnTogglePersonalData.ForeColor = System.Drawing.Color.White;
+            this.btnTogglePersonalData.Location = new System.Drawing.Point(580, 25);
+            this.btnTogglePersonalData.Name = "btnTogglePersonalData";
+            this.btnTogglePersonalData.Size = new System.Drawing.Size(150, 35);
+            this.btnTogglePersonalData.TabIndex = 5;
+            this.btnTogglePersonalData.Text = "👁️ Показать ПД";
+            this.btnTogglePersonalData.UseVisualStyleBackColor = false;
+            this.btnTogglePersonalData.Click += new System.EventHandler(this.btnTogglePersonalData_Click);
+
+            // Счетчик записей
+            this.lblCounter = new System.Windows.Forms.Label();
+            this.lblCounter.Font = new System.Drawing.Font("Segoe UI", 10F);
+            this.lblCounter.ForeColor = System.Drawing.Color.FromArgb(100, 100, 100);
+            this.lblCounter.Location = new System.Drawing.Point(750, 30);
+            this.lblCounter.Name = "lblCounter";
+            this.lblCounter.Size = new System.Drawing.Size(120, 25);
+            this.lblCounter.TabIndex = 6;
+            this.lblCounter.Text = "Показано: 0 из 0";
+            this.lblCounter.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
+
+            // Добавьте кнопки на panelBottom
+            this.panelBottom.Controls.Add(this.btnViewDetails);
+            this.panelBottom.Controls.Add(this.btnTogglePersonalData);
+            this.panelBottom.Controls.Add(this.lblCounter);
             // 
             // panelTop
             // 
