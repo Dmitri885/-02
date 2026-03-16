@@ -5,7 +5,6 @@ using Kursych.Forms.Config;
 using Kursych.Forms.Main;
 using Kursych.Helpers;
 
-
 namespace Kursych.Forms.Auth
 {
     public partial class LoginForm : Form
@@ -19,6 +18,9 @@ namespace Kursych.Forms.Auth
         private int lockSecondsRemaining = 0;
         private bool isLocked = false;
 
+        // НОВОЕ: свойство для режима блокировки
+        public bool IsLockMode { get; set; } = false;
+
         public LoginForm()
         {
             InitializeComponent();
@@ -26,7 +28,15 @@ namespace Kursych.Forms.Auth
             dbHelper = new MySQLHelper();
             dbService = new DatabaseService();
 
-            CheckConnectionOnLoad();
+            // Если это режим блокировки, меняем внешний вид
+            if (IsLockMode)
+            {
+                ConfigureLockMode();
+            }
+            else
+            {
+                CheckConnectionOnLoad();
+            }
 
             // Инициализация таймера
             if (lockTimer == null)
@@ -35,6 +45,22 @@ namespace Kursych.Forms.Auth
             }
             lockTimer.Interval = 1000;
             lockTimer.Tick += LockTimer_Tick;
+        }
+
+        // НОВОЕ: настройка формы для режима блокировки
+        private void ConfigureLockMode()
+        {
+            this.Text = "Блокировка системы - СтройБаза";
+            lblTitle.Text = "🔒 Система заблокирована";
+
+            // Скрываем кнопку настроек при блокировке
+            btnConfig.Visible = false;
+
+            // Центрируем кнопки
+            btnLogin.Location = new Point(150, 230);
+            btnExit.Location = new Point(150, 270);
+
+            // Не проверяем подключение при блокировке
         }
 
         private void CheckConnectionOnLoad()
@@ -81,9 +107,17 @@ namespace Kursych.Forms.Auth
             btnRefreshCaptcha.Visible = true;
 
             // Сдвигаем кнопки вниз
-            btnLogin.Location = new Point(100, 280);
-            btnExit.Location = new Point(210, 280);
-            btnConfig.Location = new Point(100, 320);
+            if (IsLockMode)
+            {
+                btnLogin.Location = new Point(150, 280);
+                btnExit.Location = new Point(150, 320);
+            }
+            else
+            {
+                btnLogin.Location = new Point(100, 280);
+                btnExit.Location = new Point(210, 280);
+                btnConfig.Location = new Point(100, 320);
+            }
 
             // Генерируем новую CAPTCHA
             GenerateNewCaptcha();
@@ -99,9 +133,17 @@ namespace Kursych.Forms.Auth
             lblTimer.Visible = false;
 
             // Возвращаем кнопки на место
-            btnLogin.Location = new Point(100, 180);
-            btnExit.Location = new Point(210, 180);
-            btnConfig.Location = new Point(100, 230);
+            if (IsLockMode)
+            {
+                btnLogin.Location = new Point(150, 230);
+                btnExit.Location = new Point(150, 270);
+            }
+            else
+            {
+                btnLogin.Location = new Point(100, 180);
+                btnExit.Location = new Point(210, 180);
+                btnConfig.Location = new Point(100, 230);
+            }
 
             // Очищаем поле CAPTCHA
             txtCaptcha.Clear();
@@ -145,7 +187,7 @@ namespace Kursych.Forms.Auth
             txtLogin.Enabled = false;
             txtPassword.Enabled = false;
             txtCaptcha.Enabled = false;
-            btnConfig.Enabled = false;
+            if (!IsLockMode) btnConfig.Enabled = false;
 
             // Показываем таймер
             lblTimer.Visible = true;
@@ -171,7 +213,7 @@ namespace Kursych.Forms.Auth
             txtLogin.Enabled = true;
             txtPassword.Enabled = true;
             txtCaptcha.Enabled = true;
-            btnConfig.Enabled = true;
+            if (!IsLockMode) btnConfig.Enabled = true;
 
             // Скрываем таймер
             lblTimer.Visible = false;
@@ -265,7 +307,8 @@ namespace Kursych.Forms.Auth
 
             try
             {
-                if (!dbHelper.TestConnection())
+                // В режиме блокировки проверяем только обычных пользователей (не admin из конфига)
+                if (!IsLockMode && !dbHelper.TestConnection())
                 {
                     DialogResult result = MessageBox.Show(
                         "Нет подключения к базе данных. Настроить подключение?",
@@ -280,8 +323,8 @@ namespace Kursych.Forms.Auth
                     return;
                 }
 
-                // Проверка admin из конфига
-                if (ConfigHelper.ValidateAdminCredentials(login, password))
+                // Проверка admin из конфига (только не в режиме блокировки)
+                if (!IsLockMode && ConfigHelper.ValidateAdminCredentials(login, password))
                 {
                     // Создаем пользователя-администратора
                     User adminUser = new User
@@ -323,11 +366,25 @@ namespace Kursych.Forms.Auth
                     HideCaptcha();
 
                     string roleName = UserSession.GetRoleName(user.RoleID);
-                    MessageBox.Show($"Добро пожаловать, {user.UserName}!\nРоль: {roleName}",
-                        "Успех", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
-                    this.DialogResult = DialogResult.OK;
-                    this.Close();
+                    // В режиме блокировки показываем другое сообщение
+                    if (IsLockMode)
+                    {
+                        MessageBox.Show($"Система разблокирована, {user.UserName}!",
+                            "Успех", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                        // В режиме блокировки просто возвращаем OK
+                        this.DialogResult = DialogResult.OK;
+                        this.Close();
+                    }
+                    else
+                    {
+                        MessageBox.Show($"Добро пожаловать, {user.UserName}!\nРоль: {roleName}",
+                            "Успех", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                        this.DialogResult = DialogResult.OK;
+                        this.Close();
+                    }
                 }
                 else if (user != null && !user.IsActive)
                 {
@@ -337,8 +394,18 @@ namespace Kursych.Forms.Auth
                 else
                 {
                     failedAttempts++;
-                    MessageBox.Show("Неверный логин или пароль!", "Ошибка",
-                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+
+                    // В режиме блокировки показываем другое сообщение
+                    if (IsLockMode)
+                    {
+                        MessageBox.Show("Неверный логин или пароль! Доступ запрещен.",
+                            "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                    else
+                    {
+                        MessageBox.Show("Неверный логин или пароль!", "Ошибка",
+                            MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
 
                     // После первой неудачи показываем CAPTCHA
                     if (failedAttempts >= 1 && !lblCaptcha.Visible)
@@ -359,8 +426,16 @@ namespace Kursych.Forms.Auth
 
         private void btnExit_Click(object sender, EventArgs e)
         {
-            this.DialogResult = DialogResult.Cancel;
-            this.Close();
+            // В режиме блокировки при выходе - завершаем приложение
+            if (IsLockMode)
+            {
+                Application.Exit();
+            }
+            else
+            {
+                this.DialogResult = DialogResult.Cancel;
+                this.Close();
+            }
         }
 
         private void btnConfig_Click(object sender, EventArgs e)

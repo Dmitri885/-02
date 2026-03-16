@@ -6,16 +6,23 @@ using Kursych.Forms.Products;
 using Kursych.Forms.Reports;
 using Kursych.Forms.Users;
 using Kursych.Forms.Auth;
+using Kursych.Forms.Config; // Добавьте пространство имен для настроек
 
 namespace Kursych.Forms.Main
 {
     public partial class MainForm : Form
     {
+        // Флаг для отслеживания, была ли блокировка
+        private bool isLockedByInactivity = false;
+
         public MainForm()
         {
             InitializeComponent();
             LoadUserInfo();
             ConfigureMenuVisibility();
+
+            // Подписываемся на событие блокировки
+            InactivityTracker.InactivityLock += OnInactivityLock;
         }
 
         private void LoadUserInfo()
@@ -39,6 +46,7 @@ namespace Kursych.Forms.Main
             btnReports.Visible = false;
             btnCategories.Visible = false;
             btnSuppliers.Visible = false;
+            btnSettings.Visible = false; // Добавляем кнопку настроек
 
             if (UserSession.CurrentUser == null) return;
 
@@ -51,6 +59,7 @@ namespace Kursych.Forms.Main
                 btnReports.Visible = true;
                 btnCategories.Visible = true;
                 btnSuppliers.Visible = true;
+                btnSettings.Visible = true; // Только админ видит настройки
             }
             // Менеджер (RoleID = 2)
             else if (UserSession.IsManager)
@@ -69,6 +78,55 @@ namespace Kursych.Forms.Main
             }
         }
 
+        // Обработчик события блокировки от InactivityTracker
+        private void OnInactivityLock(object sender, EventArgs e)
+        {
+            if (this.InvokeRequired)
+            {
+                this.Invoke((MethodInvoker)delegate
+                {
+                    ShowLockScreen();
+                });
+            }
+            else
+            {
+                ShowLockScreen();
+            }
+        }
+
+        // Показ формы блокировки
+        private void ShowLockScreen()
+        {
+            if (isLockedByInactivity) return;
+
+            isLockedByInactivity = true;
+
+            // Создаем форму авторизации в режиме блокировки
+            LoginForm lockForm = new LoginForm();
+            lockForm.IsLockMode = true;
+            lockForm.Text = "Блокировка системы";
+            lockForm.TopMost = true;
+            lockForm.StartPosition = FormStartPosition.CenterScreen;
+
+            // Скрываем главную форму
+            this.Hide();
+
+            // Показываем форму блокировки
+            if (lockForm.ShowDialog() == DialogResult.OK)
+            {
+                // Успешная разблокировка
+                isLockedByInactivity = false;
+                InactivityTracker.UnlockSystem();
+                this.Show();
+                this.Activate();
+            }
+            else
+            {
+                // Если пользователь закрыл форму блокировки - выходим
+                Application.Exit();
+            }
+        }
+
         // Обработчик для кнопки "Сменить пользователя"
         private void btnSwitchUser_Click(object sender, EventArgs e)
         {
@@ -80,6 +138,9 @@ namespace Kursych.Forms.Main
 
             if (result == DialogResult.Yes)
             {
+                // Останавливаем трекер бездействия
+                InactivityTracker.Stop();
+
                 // Очищаем текущую сессию
                 UserSession.Clear();
 
@@ -89,7 +150,30 @@ namespace Kursych.Forms.Main
             }
         }
 
-        // Обработчики для кнопок меню
+        // Обработчик для кнопки "Настройки"
+        private void btnSettings_Click(object sender, EventArgs e)
+        {
+            if (UserSession.CurrentUser == null)
+            {
+                MessageBox.Show("Вы не авторизованы!", "Ошибка",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            if (!UserSession.IsAdmin)
+            {
+                MessageBox.Show("У вас нет прав доступа к настройкам!",
+                    "Доступ запрещен", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            using (var settingsForm = new SettingsForm())
+            {
+                settingsForm.ShowDialog();
+            }
+        }
+
+        // Остальные обработчики (без изменений)
         private void btnUsers_Click(object sender, EventArgs e)
         {
             if (UserSession.CurrentUser == null)
@@ -202,6 +286,9 @@ namespace Kursych.Forms.Main
 
             if (result == DialogResult.Yes)
             {
+                // Останавливаем трекер бездействия
+                InactivityTracker.Stop();
+
                 // Очищаем сессию
                 UserSession.Clear();
 
@@ -212,7 +299,8 @@ namespace Kursych.Forms.Main
 
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
         {
-            // Ничего не делаем
+            // Останавливаем трекер при закрытии формы
+            InactivityTracker.Stop();
         }
     }
 }

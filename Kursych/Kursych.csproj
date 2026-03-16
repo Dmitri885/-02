@@ -73,11 +73,18 @@
       <DependentUpon>DatabaseConfigForm.cs</DependentUpon>
     </Compile>
     <Compile Include="Forms\Config\DatabaseService.cs" />
+    <Compile Include="Forms\Config\InactivityTracker.cs" />
     <Compile Include="Forms\Config\MySQLHelper.cs" />
     <Compile Include="Forms\Config\DatabaseConfigForm.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="Forms\Config\Settings.cs" />
+    <Compile Include="Forms\Config\SettingsForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\Config\SettingsForm.Designer.cs">
+      <DependentUpon>SettingsForm.cs</DependentUpon>
+    </Compile>
     <Compile Include="Forms\Config\UserSession.cs" />
     <Compile Include="Forms\Directories\CategoriesForm.cs">
       <SubType>Form</SubType>

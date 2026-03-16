@@ -19,6 +19,7 @@
         private System.Windows.Forms.Button btnReports;
         private System.Windows.Forms.Button btnCategories;
         private System.Windows.Forms.Button btnSuppliers;
+        private System.Windows.Forms.Button btnSettings;
 
         protected override void Dispose(bool disposing)
         {
@@ -65,6 +66,32 @@
             this.panelLeft.Name = "panelLeft";
             this.panelLeft.Size = new System.Drawing.Size(280, 700);
             this.panelLeft.TabIndex = 0;
+
+
+            // 
+            // btnSettings
+            // 
+            this.btnSettings = new System.Windows.Forms.Button();
+            this.btnSettings.BackColor = System.Drawing.Color.FromArgb(52, 73, 94);
+            this.btnSettings.FlatAppearance.BorderSize = 0;
+            this.btnSettings.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(46, 134, 222);
+            this.btnSettings.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnSettings.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold);
+            this.btnSettings.ForeColor = System.Drawing.Color.White;
+            this.btnSettings.ImageAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            this.btnSettings.Location = new System.Drawing.Point(13, 401);
+            this.btnSettings.Margin = new System.Windows.Forms.Padding(3, 3, 3, 10);
+            this.btnSettings.Name = "btnSettings";
+            this.btnSettings.Padding = new System.Windows.Forms.Padding(20, 0, 0, 0);
+            this.btnSettings.Size = new System.Drawing.Size(240, 50);
+            this.btnSettings.TabIndex = 6;
+            this.btnSettings.Text = "⚙️ Настройки";
+            this.btnSettings.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            this.btnSettings.UseVisualStyleBackColor = false;
+            this.btnSettings.Click += new System.EventHandler(this.btnSettings_Click);
+
+            // Добавьте btnSettings в flowMenu.Controls
+            this.flowMenu.Controls.Add(this.btnSettings);
 
             // 
             // flowMenu
